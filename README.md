@@ -1,44 +1,6 @@
 # 📅 Kalender Sync Ultra
 
-Ein **revolutionär vereinfachtes** macOS-Tool für die Synchronisation zwischen verschiedenen Kalendern mit **EventKit-Integration** und **5613x Performance-Verbesserung**.
-
-## 🎉 **Was ist neu in v2.0.1?**
-
-### **🔥 Revolutionäre Vereinfachung**
-- **84% weniger Code** (1158 → 180 Zeilen) bei **gleicher Funktionalität**
-- **99% Zuverlässigkeit** (vorher 85%) durch Entfernung der Threading-Komplexität
-- **EventKit-Only**: Komplette Entfernung der langsamen AppleScript-Integration
-- **Ultra-wartbar**: Von komplexer zu kristallklarer Architektur
-
-### **⚡ Extreme Performance**
-- **5613x schneller** als die ursprüngliche AppleScript-Version
-- **490 Events in Sekunden** synchronisiert (vorher 8+ Minuten für 95 Events)
-- **Native macOS-Integration** durch EventKit Framework
-- **Instant GUI-Response** ohne Blocking-Operations
-
----
-
-## ✨ Features
-
-### 🚀 **Kern-Synchronisation**
-- **Ultraschnelle EventKit-Integration** - Native macOS-Performance
-- **Automatische Synchronisation** zwischen beliebigen macOS-Kalendern
-- **Manuelle Ereignisauswahl** mit interaktiver Tabelle
-- **Thread-sichere GUI** - keine Blockierung während Sync-Operationen
-- **Intelligente Event-Behandlung** (ganztägige Events, abgesagte Events)
-
-### 🎨 **Moderne Benutzeroberfläche**
-- **EventKit-Branding** mit professionellem, modernem Design
-- **Tab-basierte Struktur** für verschiedene Funktionsbereiche
-- **Responsive Threading** - GUI bleibt immer reaktionsschnell
-- **Klare Statusmeldungen** mit benutzerfreundlichen Fortschrittsanzeigen
-- **Vereinfachte UX** - Entfernung aller komplexen Batching/Caching-Optionen
-
-### 🛡️ **Zuverlässigkeit & Qualität**
-- **99% Erfolgsrate** bei Synchronisationsoperationen
-- **Thread-sichere Architektur** ohne Race-Conditions
-- **Native macOS-Berechtigungen** mit `requestAccessToEntityType_completion_`
-- **Production-ready Code** mit defensiver Programmierung
+Ein macOS-Tool für die Synchronisation zwischen verschiedenen Kalendern.
 
 ## 🔧 Installation
 
@@ -94,16 +56,6 @@ open "dist/Kalender Sync Ultra.app"
 - **Automatische Berechtigung**: macOS-Dialog wird automatisch angezeigt
 - **Fehlerbehandlung**: Klare Fehlermeldungen bei Problemen
 
-## 📊 Performance-Charakteristiken
-
-| Szenario | Kalender Sync Ultra v2.0.1 | Legacy-Version | Verbesserung |
-|----------|------------------------------|-----------------|-------------|
-| 50 Events | ~0.1 Sekunden | ~245 Sekunden | **2450x schneller** |
-| 100 Events | ~0.2 Sekunden | ~491 Sekunden | **2455x schneller** |
-| 490 Events | ~1.0 Sekunden | ~40+ Minuten | **2400x+ schneller** |
-| GUI-Response | Instant | Manchmal blockiert | **Immer responsiv** |
-| Zuverlässigkeit | 99% | 85% | **+14% verbesserter** |
-
 ## 🔍 Troubleshooting
 
 ### Häufige Probleme
@@ -126,7 +78,7 @@ python src/simple_gui.py
 open /Applications/Utilities/Console.app
 ```
 
-## 🏗️ Architektur (Ultra-Vereinfacht)
+## 🏗️ Architektur
 
 ```
 src/
@@ -188,23 +140,6 @@ Dieses Projekt steht unter der MIT-Lizenz - siehe [LICENSE](LICENSE) für Detail
 - **[TODO.md](TODO.md)** - Roadmap und zukünftige Features
 - **[VEREINFACHUNG_VERGLEICH.md](VEREINFACHUNG_VERGLEICH.md)** - Detaillierter Vorher/Nachher-Vergleich
 
-## 🏆 Projekt-Erfolg
-
-### **Quantifizierte Verbesserungen**
-- **Performance**: **5613x schneller** als AppleScript-Original
-- **Code-Qualität**: **84% weniger Code** (1158 → 180 Zeilen)
-- **Zuverlässigkeit**: **+14% Verbesserung** (85% → 99%)
-- **Wartbarkeit**: Von **komplex** zu **ultra-einfach**
-- **Benutzererfahrung**: Von **"8 Minuten warten"** zu **"instant sync"**
-
-### **Technische Exzellenz**
-- ✅ Native macOS-Integration (EventKit)
-- ✅ Thread-sichere Architektur
-- ✅ Production-ready Code-Qualität
-- ✅ Defensive Programmierung
-- ✅ Vollständig funktionsfähige App
-
----
 
 **Version**: 2.0.1 - Kalender Sync Ultra  
 **Status**: ✅ **Produktionsbereit & Vollständig funktionsfähig**  
