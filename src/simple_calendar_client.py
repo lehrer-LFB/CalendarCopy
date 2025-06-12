@@ -196,4 +196,21 @@ class SimpleCalendarClient:
 
     def is_available(self) -> bool:
         """Prüft ob der Client verfügbar ist"""
-        return self.eventkit_client.is_available() 
+        return self.eventkit_client.is_available()
+    
+    def delete_event(self, calendar_name: str, event_data: Dict[str, Any]) -> bool:
+        """
+        Löscht ein Event aus dem angegebenen Kalender
+        
+        Args:
+            calendar_name: Name des Kalenders
+            event_data: Event-Daten mit ID oder anderen Identifikatoren
+            
+        Returns:
+            bool: True wenn erfolgreich gelöscht, False bei Fehler
+        """
+        try:
+            return self.eventkit_client.delete_event(calendar_name, event_data)
+        except Exception as e:
+            logger.error(f"❌ Fehler beim Löschen von Event: {e}")
+            return False 

@@ -18,7 +18,8 @@ from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot, Qt
 from PyQt6.QtGui import QFont
 
 # Import des vereinfachten Clients
-from simple_calendar_client import SimpleCalendarClient, SyncMode
+from simple_calendar_client import SimpleCalendarClient, SyncMode, DuplicateCheckMode
+from duplicate_cleanup_tab import DuplicateCleanupTab
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -142,6 +143,12 @@ class SimpleCalendarGUI(QMainWindow):
         self.manual_tab = QWidget()
         self.tab_widget.addTab(self.manual_tab, "📋 Manuelle Auswahl der Ereignisse")
         self.setup_manual_tab()
+        
+        # Tab 3: Duplikatbereinigung - NEU!
+        self.cleanup_tab = DuplicateCleanupTab(self.calendar_client)
+        self.cleanup_tab.status_message.connect(self.log_status)
+        self.cleanup_tab.error_message.connect(self.log_error)
+        self.tab_widget.addTab(self.cleanup_tab, "🧹 Duplikatbereinigung")
         
         # Status-Bereich
         status_layout = QVBoxLayout()
@@ -301,6 +308,9 @@ class SimpleCalendarGUI(QMainWindow):
                          self.manual_source_combo, self.manual_target_combo]:
                 combo.clear()
                 combo.addItems(calendars)
+            
+            # Cleanup-Tab auch aktualisieren
+            self.cleanup_tab.update_calendars(calendars)
             
             self.log_status(f"✅ {len(calendars)} Kalender geladen")
             
