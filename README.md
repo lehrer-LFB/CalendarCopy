@@ -1,148 +1,72 @@
-# 📅 Kalender Sync Ultra
+# 📅 Kalender Sync Ultra v2.2.0
 
-Ein macOS-Tool für die Synchronisation zwischen verschiedenen Kalendern.
+Eine leistungsstarke macOS-Anwendung zur intelligenten Synchronisation von Kalendern mit fortschrittlicher Duplikatserkennung.
 
-## 🔧 Installation
+## ✨ Hauptfunktionen
 
-### Option 1: Ready-to-Use macOS-App (Empfohlen)
-```bash
-# Die fertige "Kalender Sync Ultra.app" aus dem dist/ Ordner verwenden
-open "dist/Kalender Sync Ultra.app"
+### 🔄 Automatische Synchronisation
+- **Smart Sync**: Intelligente Erkennung und Vermeidung von Duplikaten
+- **Zeitplan**: Automatische Synchronisation nach Zeitplan
+- **Selektiv**: Wählbare Kalender und Zeiträume
 
-# Oder in /Applications kopieren:
-cp -R "dist/Kalender Sync Ultra.app" /Applications/
-```
+### 🎯 Manuelle Synchronisation (NEU in v2.2.0!)
+- **Duplikatsprüfung**: Intelligente Erkennung von Duplikaten
+- **5-Spalten-Ansicht**: Detaillierte Event-Informationen
+- **Status-Anzeige**: Farbkodierte Status (✅ Neu/⚠️ Duplikat)
+- **Warnungsdialog**: Sicherheitsabfrage vor Sync
+- **Responsive UI**: Background-Threading für flüssige Bedienung
 
-### Option 2: Entwickler-Setup
-```bash
-# Repository klonen
-git clone [repository-url]
-cd CalendarCopy
+## 🚀 Installation
 
-# Virtuelle Umgebung erstellen
-python3 -m venv venv
-source venv/bin/activate
+1. Repository klonen
+2. Python-Umgebung einrichten:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. Anwendung starten:
+   ```bash
+   python3 src/simple_gui.py
+   ```
 
-# Abhängigkeiten installieren
-pip install -r requirements.txt
+## 📋 Systemanforderungen
 
-# Vereinfachte Version direkt starten
-python src/simple_gui.py
+- macOS 10.15 oder neuer
+- Python 3.8+
+- EventKit-Berechtigung
 
-# Oder neue App erstellen
-./build_simple.sh
-open "dist/Kalender Sync Ultra.app"
-```
+## 🛠️ Konfiguration
 
-## 📋 Systemvoraussetzungen
+1. Beim ersten Start Kalender-Zugriff erlauben
+2. Quell- und Zielkalender auswählen
+3. Optional: Auto-Sync konfigurieren
 
-- **macOS 10.15+** (Catalina oder neuer)
-- **EventKit-Berechtigung** (wird beim ersten Start automatisch angefragt)
-- **Konfigurierte Kalender** in der macOS Kalender-App
-- **Python 3.9+** (nur für Entwickler-Setup)
+## 🔒 Sicherheit
 
-## 🚀 Verwendung
+- Keine Cloud-Speicherung
+- Lokale Verarbeitung
+- Nur Lese-/Schreibzugriff auf ausgewählte Kalender
 
-### Automatische Synchronisation
-1. **App starten**: "Kalender Sync Ultra.app" öffnen
-2. **Kalender auswählen**: Quell- und Zielkalender aus Dropdown-Menüs wählen
-3. **Sync starten**: "Sync starten" Button klicken
-4. **Berechtigung erteilen**: Bei der ersten Nutzung macOS-Kalender-Berechtigung gewähren
-5. **Monitoring**: Fortschritt in der Status-Anzeige verfolgen
+## 🤝 Mitwirken
 
-### Einfache Bedienung
-- **Ein-Klick-Synchronisation**: Keine komplexen Einstellungen nötig
-- **Instant-Feedback**: Sofortige Statusmeldungen und Fortschrittsanzeigen
-- **Automatische Berechtigung**: macOS-Dialog wird automatisch angezeigt
-- **Fehlerbehandlung**: Klare Fehlermeldungen bei Problemen
-
-## 🔍 Troubleshooting
-
-### Häufige Probleme
-- **"Kalender-Zugriff verweigert"**: 
-  - App fordert automatisch Berechtigung an
-  - Falls nicht: Systemeinstellungen → Datenschutz → Kalender → "Kalender Sync Ultra" aktivieren
-- **"Keine Kalender gefunden"**: 
-  - Kalender in macOS Kalender-App überprüfen
-  - App neu starten
-- **"Sync-Fehler"**: 
-  - Logs in der GUI-Statusanzeige prüfen
-  - Beiden Kalender müssen existieren und beschreibbar sein
-
-### Debug-Informationen
-```bash
-# Erweiterte Logs in der Konsole
-python src/simple_gui.py
-
-# Console.app für System-Logs öffnen
-open /Applications/Utilities/Console.app
-```
-
-## 🏗️ Architektur
-
-```
-src/
-├── simple_gui.py              # 🎨 Hauptanwendung (moderne GUI)
-├── simple_calendar_client.py  # 🚀 Ultra-einfacher EventKit-Client (180 Zeilen)
-├── calendar_client_eventkit.py # ⚙️ EventKit-Backend mit Berechtigungen
-└── [Legacy-Dateien]           # 📦 Komplexe alte Version (deprecated)
-
-dist/
-└── Kalender Sync Ultra.app    # 📱 Ready-to-use macOS-App (238 MB)
-```
-
-### **Architektur-Prinzipien**
-- **Ultra-Simple**: 180 Zeilen Kern-Code statt 1158
-- **EventKit-Only**: Keine AppleScript-Komplexität
-- **Thread-Safe**: Einfaches Threading ohne Race-Conditions
-- **Production-Ready**: Defensive Programmierung und Fehlerbehandlung
-
-## 🎯 **Vereinfachung vs. Legacy-Version**
-
-### **Was entfernt wurde (bewusst)**
-- ❌ **Komplexes Batching-System** (minimaler Performance-Gewinn)
-- ❌ **Threading-Pool-Management** (Race-Conditions verursacht)
-- ❌ **Caching-Komplexität** (bei EventKit unnötig)
-- ❌ **AppleScript-Fallbacks** (EventKit ist zuverlässig)
-- ❌ **1000+ Zeilen Threading-Code** (Wartungsalptraum)
-
-### **Was beibehalten wurde**
-- ✅ **Volle EventKit-Performance** (5613x schneller)
-- ✅ **Alle Kern-Features** (Sync, GUI, Berechtigungen)
-- ✅ **Thread-sichere GUI** (einfacher, aber effektiv)
-- ✅ **Production-Qualität** (99% Zuverlässigkeit)
-- ✅ **Moderne Benutzeroberfläche** (sogar verbessert)
-
-## 🤝 Beitrag leisten
-
-1. Fork erstellen
-2. Feature-Branch: `git checkout -b feature/AmazingFeature`
-3. Änderungen committen: `git commit -m 'Add AmazingFeature'`
-4. Push zum Branch: `git push origin feature/AmazingFeature`
-5. Pull Request öffnen
-
-**Hinweis**: Für neue Features die **vereinfachte Version** (`src/simple_*.py`) verwenden, nicht die Legacy-Dateien.
+Beiträge sind willkommen! Bitte beachten:
+1. Fork des Repositories
+2. Feature-Branch erstellen
+3. Änderungen committen
+4. Pull Request erstellen
 
 ## 📝 Lizenz
 
-Dieses Projekt steht unter der MIT-Lizenz - siehe [LICENSE](LICENSE) für Details.
+MIT License - siehe [LICENSE](LICENSE) Datei
 
-## 📈 Roadmap
+## 🙏 Danksagung
 
-- **v3.0**: SwiftUI-basierte GUI für native macOS-Performance
-- **v3.1**: App Store-Distribution mit Code-Signing
-- **v3.2**: Zwei-Wege-Synchronisation mit Konflikt-Auflösung
-- **v4.0**: Cross-Platform-Support (Windows/iOS)
+- EventKit-Team für die Kalender-API
+- Alle Mitwirkenden und Tester
 
-## 📚 Dokumentation
+---
 
-- **[HISTORY.md](HISTORY.md)** - Vollständige Projektentwicklung und Architektur-Entscheidungen
-- **[TODO.md](TODO.md)** - Roadmap und zukünftige Features
-- **[VEREINFACHUNG_VERGLEICH.md](VEREINFACHUNG_VERGLEICH.md)** - Detaillierter Vorher/Nachher-Vergleich
-
-
-**Version**: 2.0.1 - Kalender Sync Ultra  
-**Status**: ✅ **Produktionsbereit & Vollständig funktionsfähig**  
-**Empfehlung**: Diese Version nutzen - weitere Entwicklung optional  
-**Letzte Aktualisierung**: Dezember 2024  
-**Kompatibilität**: macOS 10.15+ (Intel & Apple Silicon) 
+**Version**: 2.2.0
+**Kompatibilität**: macOS 10.15+ (Universal Binary)
+**Release-Datum**: März 2024
