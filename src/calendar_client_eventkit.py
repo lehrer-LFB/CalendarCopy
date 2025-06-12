@@ -335,6 +335,106 @@ class EventKitCalendarClient:
             self.logger.error(f"Fehler beim Batch-Erstellen der Events: {e}")
             return success_count, len(events)
 
+    def delete_event(self, calendar_name: str, event_data: Dict[str, Any]) -> bool:
+        """
+        Löscht ein Event aus dem angegebenen Kalender
+        
+        Args:
+            calendar_name: Name des Kalenders
+            event_data: Event-Daten mit Titel, Datum etc. für die Identifikation
+            
+        Returns:
+            bool: True wenn erfolgreich gelöscht, False bei Fehler
+        """
+        if not self.is_available():
+            self.logger.warning("EventKit nicht verfügbar für delete_event")
+            return False
+            
+        try:
+            # Finde den Kalender
+            target_calendar = self._find_calendar(calendar_name)
+            if not target_calendar:
+                self.logger.error(f"Kalender '{calendar_name}' nicht gefunden")
+                return False
+            
+            # Suche das Event anhand der Eigenschaften
+            event_to_delete = self._find_event_by_properties(target_calendar, event_data)
+            if not event_to_delete:
+                self.logger.warning(f"Event nicht gefunden: {event_data.get('title', 'Unbekannt')}")
+                return False
+            
+            # Lösche das Event
+            success = self.event_store.removeEvent_span_error_(event_to_delete, 0, None)
+            
+            if success:
+                self.logger.debug(f"Event '{event_data.get('title', 'Unbekannt')}' erfolgreich gelöscht")
+                return True
+            else:
+                self.logger.error(f"Event '{event_data.get('title', 'Unbekannt')}' konnte nicht gelöscht werden")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Fehler beim Löschen des Events: {e}")
+            return False
+
+    def _find_event_by_properties(self, calendar, event_data: Dict[str, Any]):
+        """
+        Findet ein Event anhand seiner Eigenschaften (Titel, Datum, etc.)
+        """
+        if not self.is_available():
+            return None
+            
+        try:
+            # Zeitraum für die Suche definieren (±1 Tag um das Event-Datum)
+            start_date = event_data.get('start_date')
+            if not start_date:
+                return None
+                
+            if isinstance(start_date, str):
+                # Versuche String zu datetime zu konvertieren
+                try:
+                    start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                except:
+                    return None
+            
+            search_start = start_date - timedelta(hours=1)
+            search_end = start_date + timedelta(hours=25)  # Ganztägige Events berücksichtigen
+            
+            # Erstelle Predicate für die Suche
+            predicate = self.event_store.predicateForEventsWithStartDate_endDate_calendars_(
+                self._datetime_to_nsdate(search_start),
+                self._datetime_to_nsdate(search_end),
+                [calendar]
+            )
+            
+            # Hole Events im Zeitraum
+            events = self.event_store.eventsMatchingPredicate_(predicate)
+            
+            # Suche nach dem passenden Event
+            target_title = event_data.get('title', '').strip()
+            target_location = event_data.get('location', '').strip()
+            
+            for event in events:
+                event_title = (event.title() or '').strip()
+                event_location = (event.location() or '').strip()
+                
+                # Vergleiche Titel (case-insensitive)
+                if event_title.lower() == target_title.lower():
+                    # Zusätzliche Prüfung auf Ort falls vorhanden
+                    if not target_location or event_location.lower() == target_location.lower():
+                        # Prüfe auch das Datum (sollte sehr nah sein)
+                        event_start = self._nsdate_to_datetime(event.startDate())
+                        time_diff = abs((event_start - start_date).total_seconds())
+                        
+                        if time_diff < 3600:  # Maximal 1 Stunde Unterschied
+                            return event
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Fehler bei der Event-Suche: {e}")
+            return None
+
     # Hilfsmethoden
     def _find_calendar(self, calendar_name: str):
         """Findet einen Kalender anhand des Namens"""

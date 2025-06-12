@@ -51,12 +51,13 @@ class SimpleSyncWorker(QThread):
     sync_complete = pyqtSignal(int)
     error = pyqtSignal(str)
 
-    def __init__(self, client, source_calendar, target_calendar, sync_mode):
+    def __init__(self, client, source_calendar, target_calendar, sync_mode, duplicate_check_mode=DuplicateCheckMode.MODERATE):
         super().__init__()
         self.client = client
         self.source_calendar = source_calendar
         self.target_calendar = target_calendar
         self.sync_mode = sync_mode
+        self.duplicate_check_mode = duplicate_check_mode
         self.is_running = True
 
     def run(self):
@@ -66,7 +67,8 @@ class SimpleSyncWorker(QThread):
             count = self.client.sync_calendars(
                 self.source_calendar, 
                 self.target_calendar, 
-                self.sync_mode
+                self.sync_mode,
+                self.duplicate_check_mode
             )
             
             self.sync_complete.emit(count)
@@ -245,6 +247,11 @@ class SimpleCalendarGUI(QMainWindow):
         self.load_events_button.clicked.connect(self.load_events_threaded)
         load_layout.addWidget(self.load_events_button)
         
+        self.check_duplicates_button = QPushButton('🔍 Duplikate prüfen')
+        self.check_duplicates_button.clicked.connect(self.check_duplicates_threaded)
+        self.check_duplicates_button.setEnabled(False)
+        load_layout.addWidget(self.check_duplicates_button)
+        
         self.select_all_button = QPushButton('✅ Alle auswählen')
         self.select_all_button.clicked.connect(self.select_all_events)
         load_layout.addWidget(self.select_all_button)
@@ -256,20 +263,21 @@ class SimpleCalendarGUI(QMainWindow):
         
         # Event-Tabelle
         self.events_table = QTableWidget()
-        self.events_table.setColumnCount(4)
-        self.events_table.setHorizontalHeaderLabels(['✓', 'Titel', 'Datum', 'Beschreibung'])
+        self.events_table.setColumnCount(5)
+        self.events_table.setHorizontalHeaderLabels(['✓', 'Titel', 'Datum', 'Beschreibung', 'Status'])
         
         header = self.events_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         
         layout.addWidget(self.events_table)
         
         # Sync-Button
         self.sync_selected_button = QPushButton('🚀 Ausgewählte synchronisieren')
-        self.sync_selected_button.clicked.connect(self.sync_selected_events)
+        self.sync_selected_button.clicked.connect(self.sync_selected_events_with_warning)
         self.sync_selected_button.setEnabled(False)
         layout.addWidget(self.sync_selected_button)
 
@@ -399,6 +407,7 @@ class SimpleCalendarGUI(QMainWindow):
             self.log_status("ℹ️ Keine zukünftigen Events gefunden")
             self.events_table.setRowCount(0)
             self.sync_selected_button.setEnabled(False)
+            self.check_duplicates_button.setEnabled(False)
             return
         
         # Fülle Tabelle
@@ -422,8 +431,14 @@ class SimpleCalendarGUI(QMainWindow):
             # Beschreibung
             desc = event.get('description', '')[:50] + ('...' if len(event.get('description', '')) > 50 else '')
             self.events_table.setItem(row, 3, QTableWidgetItem(desc))
+            
+            # Status - initial leer
+            status_item = QTableWidgetItem("❓ Ungeprüft")
+            status_item.setBackground(Qt.GlobalColor.lightGray)
+            self.events_table.setItem(row, 4, status_item)
         
         self.sync_selected_button.setEnabled(True)
+        self.check_duplicates_button.setEnabled(True)
         self.log_status(f"📋 {len(self.loaded_events)} Events geladen")
 
     @pyqtSlot()
@@ -458,6 +473,140 @@ class SimpleCalendarGUI(QMainWindow):
             self.log_error("❌ Keine Events ausgewählt")
             return
         
+        self.sync_selected_button.setEnabled(False)
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, len(selected_events))
+        
+        self.current_worker = SimpleBackgroundWorker(
+            self.calendar_client.create_events_simple, target, selected_events
+        )
+        self.current_worker.result.connect(lambda result: [
+            self.sync_selected_button.setEnabled(True),
+            self.progress_bar.setVisible(False),
+            self.log_status(f"✅ Manuelle Sync: {result[0]}/{len(selected_events)} Events erfolgreich")
+        ])
+        self.current_worker.error.connect(self.log_error)
+        self.current_worker.start()
+
+    def check_duplicates_threaded(self):
+        """Prüft Events auf Duplikate im Zielkalender"""
+        target = self.manual_target_combo.currentText()
+        if not target:
+            self.log_error("❌ Bitte Zielkalender auswählen")
+            return
+        
+        if not self.loaded_events:
+            self.log_error("❌ Keine Events geladen")
+            return
+        
+        if self.current_worker and self.current_worker.isRunning():
+            return
+        
+        self.check_duplicates_button.setEnabled(False)
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        
+        self.current_worker = SimpleBackgroundWorker(
+            self._check_events_for_duplicates, target
+        )
+        self.current_worker.result.connect(self._on_duplicates_checked)
+        self.current_worker.error.connect(self.log_error)
+        self.current_worker.finished.connect(lambda: [
+            self.check_duplicates_button.setEnabled(True),
+            self.progress_bar.setVisible(False)
+        ])
+        self.current_worker.start()
+
+    def _check_events_for_duplicates(self, target_calendar):
+        """Prüft Events auf Duplikate (läuft im Hintergrund)"""
+        try:
+            # Lade Ziel-Events
+            target_events = self.calendar_client.get_events(target_calendar, SyncMode.ALL)
+            
+            # Prüfe jedes Event auf Duplikate
+            duplicate_status = []
+            for event in self.loaded_events:
+                is_duplicate = False
+                for target_event in target_events:
+                    if self.calendar_client._is_duplicate_event(event, target_event, DuplicateCheckMode.MODERATE):
+                        is_duplicate = True
+                        break
+                duplicate_status.append(is_duplicate)
+            
+            return duplicate_status
+            
+        except Exception as e:
+            raise Exception(f"Fehler bei Duplikatsprüfung: {e}")
+
+    def _on_duplicates_checked(self, duplicate_status):
+        """Verarbeitet Ergebnis der Duplikatsprüfung"""
+        try:
+            new_count = 0
+            duplicate_count = 0
+            
+            for row, is_duplicate in enumerate(duplicate_status):
+                if row < self.events_table.rowCount():
+                    if is_duplicate:
+                        status_item = QTableWidgetItem("⚠️ Duplikat")
+                        status_item.setBackground(Qt.GlobalColor.yellow)
+                        duplicate_count += 1
+                    else:
+                        status_item = QTableWidgetItem("✅ Neu")
+                        status_item.setBackground(Qt.GlobalColor.green)
+                        new_count += 1
+                    
+                    self.events_table.setItem(row, 4, status_item)
+            
+            self.log_status(f"🔍 Duplikatsprüfung abgeschlossen: {new_count} neue Events, {duplicate_count} Duplikate")
+            
+        except Exception as e:
+            self.log_error(f"Fehler beim Verarbeiten der Duplikatsprüfung: {e}")
+
+    def sync_selected_events_with_warning(self):
+        """Synchronisiert ausgewählte Events mit Duplikat-Warnung"""
+        target = self.manual_target_combo.currentText()
+        if not target:
+            self.log_error("❌ Bitte Zielkalender auswählen")
+            return
+        
+        # Sammle ausgewählte Events
+        selected_events = []
+        selected_duplicates = []
+        
+        for row in range(self.events_table.rowCount()):
+            checkbox = self.events_table.cellWidget(row, 0)
+            if checkbox and checkbox.isChecked() and row < len(self.loaded_events):
+                event = self.loaded_events[row]
+                selected_events.append(event)
+                
+                # Prüfe Status
+                status_item = self.events_table.item(row, 4)
+                if status_item and "Duplikat" in status_item.text():
+                    selected_duplicates.append(event)
+        
+        if not selected_events:
+            self.log_error("❌ Keine Events ausgewählt")
+            return
+        
+        # Warnung bei Duplikaten
+        if selected_duplicates:
+            duplicate_titles = [event.get('summary', 'Unbekannt') for event in selected_duplicates[:5]]
+            if len(selected_duplicates) > 5:
+                duplicate_titles.append(f"... und {len(selected_duplicates) - 5} weitere")
+            
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setWindowTitle("Duplikate gefunden")
+            msg.setText(f"⚠️ {len(selected_duplicates)} der ausgewählten Events existieren bereits im Zielkalender:")
+            msg.setDetailedText("\n".join(duplicate_titles))
+            msg.setInformativeText("Möchten Sie trotzdem fortfahren?")
+            msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg.setDefaultButton(QMessageBox.StandardButton.No)
+            
+            if msg.exec() != QMessageBox.StandardButton.Yes:
+                return
+        
+        # Führe normale Synchronisation durch
         self.sync_selected_button.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, len(selected_events))

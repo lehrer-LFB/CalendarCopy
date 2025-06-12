@@ -41,7 +41,7 @@ class DuplicateSearchWorker(QThread):
             self.progress.emit(f"🔍 Lade Events aus '{self.calendar_name}'...")
             
             # Events laden
-            events = self.client.load_events(self.calendar_name, mode='all')
+            events = self.client.get_events(self.calendar_name, 'all')
             if not events:
                 self.progress.emit("❌ Keine Events gefunden")
                 self.duplicates_found.emit([])

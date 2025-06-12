@@ -32,6 +32,7 @@ OPTIONS = {
         # Unsere vereinfachten Module
         'src.simple_calendar_client',
         'src.calendar_client_eventkit',
+        'src.duplicate_cleanup_tab',
     ],
     'packages': [
         'PyQt6', 

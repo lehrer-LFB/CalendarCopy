@@ -24,6 +24,11 @@ class SyncMode:
     ALL = "all"
     FUTURE = "future"
 
+class DuplicateCheckMode:
+    LOOSE = "loose"
+    MODERATE = "moderate"
+    STRICT = "strict"
+
 class SimpleCalendarClient:
     """
     Vereinfachter Kalender-Client nur mit EventKit
@@ -72,8 +77,10 @@ class SimpleCalendarClient:
             # Konvertiere zu einheitlichem Format
             converted_events = []
             for event in events:
+                title = event.get('title', '')
                 converted_event = {
-                    'summary': event.get('title', ''),
+                    'summary': title,
+                    'title': title,  # Für Kompatibilität mit duplicate_cleanup_tab
                     'start_date': event.get('start_date'),
                     'end_date': event.get('end_date'),
                     'description': event.get('description', ''),
@@ -113,48 +120,175 @@ class SimpleCalendarClient:
             logger.error(f"Fehler beim Erstellen des Events: {e}")
             return False
 
-    def sync_calendars(self, source_calendar: str, target_calendar: str, sync_mode: str = SyncMode.ALL) -> int:
+    def sync_calendars(self, source_calendar: str, target_calendar: str, sync_mode: str = SyncMode.ALL, duplicate_check_mode: str = DuplicateCheckMode.MODERATE) -> int:
         """
-        Synchronisiert Ereignisse zwischen zwei Kalendern
+        Synchronisiert Ereignisse zwischen zwei Kalendern mit Duplikatsprüfung
         
-        ULTRA-VEREINFACHT:
-        1. Lade Events (0.05s)
-        2. Erstelle Events einzeln (0.1s total für 50 Events)
-        3. Fertig!
+        INKREMENTELLER SYNC:
+        1. Lade Quell-Events
+        2. Lade Ziel-Events für Duplikatsprüfung
+        3. Filtere bereits existierende Events heraus
+        4. Erstelle nur neue Events
         """
         try:
-            logger.info(f"🔄 Starte Sync: {source_calendar} → {target_calendar}")
+            logger.info(f"🔄 Starte Sync mit Duplikatsprüfung: {source_calendar} → {target_calendar}")
+            logger.info(f"📋 Modus: {sync_mode}, Duplikatsprüfung: {duplicate_check_mode}")
             
             # 1. Lade Quell-Events
-            events = self.get_events(source_calendar, sync_mode)
+            source_events = self.get_events(source_calendar, sync_mode)
             
-            if not events:
+            if not source_events:
                 logger.info("Keine Events zum Synchronisieren gefunden")
                 return 0
             
-            logger.info(f"📋 {len(events)} Events zu synchronisieren")
+            # 2. Lade existierende Events aus Zielkalender
+            logger.info("🔍 Lade existierende Events aus Zielkalender...")
+            target_events = self.get_events(target_calendar, SyncMode.ALL)
             
-            # 2. Erstelle Events einzeln (super schnell mit EventKit)
+            logger.info(f"📊 {len(source_events)} Quell-Events, {len(target_events)} Ziel-Events")
+            
+            # 3. Filtere Duplikate heraus
+            new_events = self._filter_duplicates(source_events, target_events, duplicate_check_mode)
+            
+            if not new_events:
+                logger.info("✅ Sync mit Duplikatsprüfung abgeschlossen:")
+                logger.info(f"   📝 0 Events erstellt")
+                logger.info(f"   ⏭️ {len(source_events)} Duplikate übersprungen")
+                logger.info(f"   ❌ 0 Fehler")
+                return 0
+            
+            logger.info(f"📋 {len(new_events)} neue Events zu erstellen (von {len(source_events)} Quell-Events)")
+            
+            # 4. Erstelle nur neue Events
             success_count = 0
-            for i, event in enumerate(events, 1):
+            error_count = 0
+            
+            for i, event in enumerate(new_events, 1):
                 try:
                     if self.create_event(target_calendar, event):
                         success_count += 1
+                    else:
+                        error_count += 1
                     
-                    # Optional: Progress-Logging nur bei vielen Events
-                    if len(events) > 20 and i % 10 == 0:
-                        logger.info(f"📊 Fortschritt: {i}/{len(events)} Events verarbeitet")
+                    # Progress-Logging
+                    if len(new_events) > 10 and i % 10 == 0:
+                        logger.info(f"📊 Fortschritt: {i}/{len(new_events)} Events verarbeitet")
                         
                 except Exception as e:
+                    error_count += 1
                     logger.warning(f"Event {i} übersprungen: {e}")
                     continue
             
-            logger.info(f"✅ Sync abgeschlossen: {success_count}/{len(events)} Events erfolgreich")
+            # Finale Statistik
+            duplicates_skipped = len(source_events) - len(new_events)
+            logger.info(f"✅ Sync mit Duplikatsprüfung abgeschlossen:")
+            logger.info(f"   📝 {success_count} Events erstellt")
+            logger.info(f"   ⏭️ {duplicates_skipped} Duplikate übersprungen")
+            logger.info(f"   ❌ {error_count} Fehler")
+            
             return success_count
             
         except Exception as e:
             logger.error(f"❌ Sync-Fehler: {e}")
             return 0
+
+    def _filter_duplicates(self, source_events: List[Dict[str, Any]], target_events: List[Dict[str, Any]], check_mode: str) -> List[Dict[str, Any]]:
+        """
+        Filtert Duplikate aus den Quell-Events basierend auf bereits existierenden Ziel-Events
+        
+        Args:
+            source_events: Events aus dem Quellkalender
+            target_events: Events aus dem Zielkalender
+            check_mode: Duplikatsprüfungs-Modus (loose, moderate, strict)
+            
+        Returns:
+            Liste der Events, die noch nicht im Zielkalender existieren
+        """
+        if not target_events:
+            return source_events
+        
+        new_events = []
+        
+        for source_event in source_events:
+            is_duplicate = False
+            
+            for target_event in target_events:
+                if self._is_duplicate_event(source_event, target_event, check_mode):
+                    is_duplicate = True
+                    break
+            
+            if not is_duplicate:
+                new_events.append(source_event)
+        
+        return new_events
+
+    def _is_duplicate_event(self, event1: Dict[str, Any], event2: Dict[str, Any], check_mode: str) -> bool:
+        """
+        Prüft, ob zwei Events Duplikate sind basierend auf dem Check-Modus
+        
+        Args:
+            event1: Erstes Event
+            event2: Zweites Event
+            check_mode: Prüfmodus (loose, moderate, strict)
+            
+        Returns:
+            True wenn Events als Duplikate gelten
+        """
+        try:
+            # Titel vergleichen (case-insensitive)
+            title1 = (event1.get('title', '') or event1.get('summary', '')).strip().lower()
+            title2 = (event2.get('title', '') or event2.get('summary', '')).strip().lower()
+            
+            if not title1 or not title2 or title1 != title2:
+                return False
+            
+            # Datum vergleichen
+            start1 = event1.get('start_date')
+            start2 = event2.get('start_date')
+            
+            if not start1 or not start2:
+                return False
+            
+            # Konvertiere zu datetime falls nötig
+            if isinstance(start1, str):
+                try:
+                    start1 = datetime.fromisoformat(start1.replace('Z', '+00:00'))
+                except ValueError:
+                    # Fallback für andere Datumsformate
+                    from dateutil import parser
+                    start1 = parser.parse(start1)
+            if isinstance(start2, str):
+                try:
+                    start2 = datetime.fromisoformat(start2.replace('Z', '+00:00'))
+                except ValueError:
+                    # Fallback für andere Datumsformate
+                    from dateutil import parser
+                    start2 = parser.parse(start2)
+            
+            # Datum-Vergleich (nur Tag bei loose, sonst mit Zeit)
+            if check_mode == DuplicateCheckMode.LOOSE:
+                # Nur Datum vergleichen
+                if start1.date() != start2.date():
+                    return False
+            else:
+                # Datum + Zeit vergleichen (mit Toleranz von 1 Minute)
+                time_diff = abs((start1 - start2).total_seconds())
+                if time_diff > 60:  # Mehr als 1 Minute Unterschied
+                    return False
+            
+            # Bei strict mode auch Ort vergleichen
+            if check_mode == DuplicateCheckMode.STRICT:
+                location1 = (event1.get('location', '') or '').strip().lower()
+                location2 = (event2.get('location', '') or '').strip().lower()
+                
+                if location1 != location2:
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Fehler beim Duplikat-Vergleich: {e}")
+            return False
 
     def create_events_simple(self, calendar_name: str, events: List[Dict[str, Any]]) -> tuple:
         """Erstellt mehrere Events ohne Batching-Komplexität"""
